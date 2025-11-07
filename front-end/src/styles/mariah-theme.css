@@ -1,0 +1,231 @@
+/* src/styles/mariah-theme.css */
+/* Global version of Mariah’s look (no scoping), safe for the whole app */
+
+/* Layout / background */
+html, body, #root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3730a3 100%);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+/* Top bar */
+.top-bar {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.25rem 0;
+}
+.brand-container {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+.brand-icon-box {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+.brand-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+.brand-subtitle {
+  font-size: 0.813rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+.user-info-text {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  margin: 0;
+}
+.user-name {
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Shared panel look */
+.panel {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 2rem;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.panel-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: white;
+  margin: 0 0 0.25rem 0;
+}
+.panel-description {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+/* Form controls (works with Bootstrap inputs) */
+.form-label-custom {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+.form-control {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: white;
+}
+.form-control::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+.form-control:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+  box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
+}
+.input-group-text {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* === NEW: Disabled/readonly control fixes on dark glass === */
+.form-control:disabled,
+.form-control[readonly] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  opacity: 1 !important; /* undo Bootstrap dimming */
+  -webkit-text-fill-color: #ffffff; /* Safari */
+}
+.input-group .form-control:disabled,
+.input-group .form-control[readonly] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+/* Buttons */
+.btn-dark, .btn-outline-dark, .btn-primary, .btn-secondary {
+  border-radius: 0.5rem;
+}
+.btn-process-payment {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 0.875rem 2rem;
+  font-size: 0.938rem;
+  transition: all 0.2s;
+}
+.btn-process-payment:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Alerts */
+.alert-custom {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 1rem;
+  color: white;
+  font-size: 0.875rem;
+}
+.alert-custom.success { border-left: 3px solid #10b981; }
+.alert-custom.error   { border-left: 3px solid #ef4444; }
+
+/* Utility */
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  margin: 0 0 1rem 0;
+}
+
+.text-on-dark, .panel, .brand-title, .section-title, .panel-title, .user-name {
+  color: white;
+}
+
+/* Give the main app container some breathing room */
+.main-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.content-container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+/* === Warehouse UI text contrast fix === */
+.form-label,
+.text-muted,
+.card-body,
+.card-body .small,
+.card-body .fw-semibold,
+.card-body h5 {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+h5.text-center { color: #ffffff !important; }
+
+/* Fix Bootstrap card background to match glass panel style */
+.card.portal-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  color: white;
+}
+
+/* Lighten any "text-muted" labels inside the card */
+.card.portal-card .text-muted {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* === Top-right tab button text visibility === */
+.btn-outline-dark {
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+.btn-outline-dark:hover,
+.btn-outline-dark:focus {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.7) !important;
+}
+.btn-dark {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+  color: #ffffff !important;
+}
+.btn-dark:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.7) !important;
+}
