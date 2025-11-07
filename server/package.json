@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "db:verify": "node scripts/verify-db-consistency.js",
     "reset-db:original7": "node scripts/reset-db.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

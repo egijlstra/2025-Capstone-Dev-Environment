@@ -34,3 +34,6 @@ try {
 
 // Export default for compatibility with any existing default imports
 export default db;
+
+// Named export for explicit imports
+export function getDb() { return db; }

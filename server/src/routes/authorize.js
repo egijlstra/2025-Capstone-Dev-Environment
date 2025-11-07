@@ -9,6 +9,9 @@ import {
   createAuthorization,
 } from '../db/index.js';
 
+// Enable debug logging if DEBUG_AUTH=1 is set
+const DEBUG = String(process.env.DEBUG_AUTH || '') === '1';
+
 const router = Router();
 
 // helpers
@@ -26,6 +29,7 @@ const toMoney = (n) => Number(Number(n).toFixed(2));
  * }
  */
 router.post('/', async (req, res) => {
+  if (DEBUG) console.log('[AUTH] incoming body:', JSON.stringify(req.body));
   try {
     // --- normalize incoming UI variants into the canonical shape above ---
     // This preserves contract while accepting newer/simpler payloads from the checkout UI.
