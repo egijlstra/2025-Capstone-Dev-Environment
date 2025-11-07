@@ -40,6 +40,21 @@ function isFutureExpiry(mmYY) {
   return endOfMonth >= new Date();
 }
 
+// --- Card number & CVV length helpers ---
+function getExpectedPanLength(type) {
+  // Visa/MC = 16, AmEx = 15
+  if (type === 'American Express') return 15;
+  if (type === 'Visa' || type === 'Mastercard') return 16;
+  return null; // unknown brand → no strict PAN rule
+}
+
+function getExpectedCvvLength(type) {
+  // AmEx = 4, Visa/MC = 3
+  if (type === 'American Express') return 4;
+  if (type === 'Visa' || type === 'Mastercard') return 3;
+  return 3; // default to 3 if unknown
+}
+
 /** ---------- Card number formatting helpers ---------- **/
 function getCardFormat(type) {
   switch (type) {
@@ -131,12 +146,30 @@ export default function PaymentProcessingUI() {
       return;
     }
 
+    // 🔒 Brand-specific PAN/CVV validation (FR polish)
+    const digitsOnly = String(cardNumber).replace(/\D/g, '');
+    const brand = detectCardType(digitsOnly) || cardType; // re-detect from digits just in case
+
+    const expectedPan = getExpectedPanLength(brand);
+    if (expectedPan && digitsOnly.length !== expectedPan) {
+      setErrorMsg(`Card number must be ${expectedPan} digits for ${brand}.`);
+      setSubmitting(false);
+      return;
+    }
+
+    const expectedCvv = getExpectedCvvLength(brand);
+    if (!/^\d+$/.test(cvv) || cvv.length !== expectedCvv) {
+      setErrorMsg(`CVV must be ${expectedCvv} digits for ${brand || 'this card'}.`);
+      setSubmitting(false);
+      return;
+    }
+
     try {
       // Build payload; sanitize PAN back to digits
       const payload = {
         orderId,
         amount,
-        cardNumber: String(cardNumber).replace(/\D/g, ''), // sanitize
+        cardNumber: digitsOnly, // sanitize
         cvv,
         nameOnCard,
         expiry,
