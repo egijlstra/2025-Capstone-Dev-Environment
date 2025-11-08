@@ -1,4 +1,9 @@
+// --------------------------------------------------------------------
 // src/routes/orders.js
+// Express router handling /api/orders GET requests
+// Returns order listings and detailed order information.
+// Includes filtering, sorting, and aggregation of related data.
+// --------------------------------------------------------------------
 import { Router } from 'express';
 const router = Router();
 
@@ -68,9 +73,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ===========================================================
+// ==========================================================
 // GET /api/orders/:id
 // Returns detailed order info for the Warehouse Settlement UI.
+// Includes order, authorization, settlements, and availableToSettle amount.
 // ===========================================================
 router.get('/:id', async (req, res) => {
   try {

@@ -1,4 +1,9 @@
+// ----------------------------------------------------------------------------
 // src/main.jsx
+// Entry point for the warehouse admin portal React application.
+// Renders the main App component into the root DOM element.
+// Imports global styles including Bootstrap and custom themes.
+// ----------------------------------------------------------------------------
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 

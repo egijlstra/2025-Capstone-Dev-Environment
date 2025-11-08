@@ -1,4 +1,9 @@
+// --------------------------------------------------------------------
 // src/routes/order-next.js
+// Express router handling /api/orders/next GET requests
+// Provides the next available order ID and a randomly generated amount.
+// Useful for checkout UIs to obtain new order identifiers and amounts.
+// --------------------------------------------------------------------
 import { Router } from 'express';
 import { getNextOrderIdORD, generateRandomAmount } from '../db/sequence.js';
 

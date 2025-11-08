@@ -1,5 +1,7 @@
 // scripts/verify-db-consistency.js
-// ESM friendly; uses your existing Better-SQLite3 instance.
+// ESM friendly; Better-SQLite3 instance.
+// Script to verify database consistency according to business rules
+// Run with: node scripts/verify-db-consistency.js
 
 import { db } from '../src/db/sqlite.js';
 

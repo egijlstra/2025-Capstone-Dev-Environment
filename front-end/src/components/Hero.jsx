@@ -1,4 +1,9 @@
+// --------------------------------------------------------------
 // src/components/Hero.jsx
+//  Hero component for the Manhattan Associates Warehouse Portal
+//  Displays a banner with title and subtitle
+// Currently unused in favor of mariah-theme.css styles
+// --------------------------------------------------------------
 export default function Hero() {
   return (
     <header className="py-5 hero-banner" style={{ background: 'transparent' }}>

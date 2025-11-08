@@ -1,4 +1,10 @@
+// ----------------------------------------------------------------------------
 // src/lib/api.js
+// API helper functions for interacting with the backend service.
+// Provides methods for authorizing payments, retrieving order details,
+// posting settlements, listing orders, and fetching the next order to process.
+// Utilizes Axios for HTTP requests.
+// ----------------------------------------------------------------------------
 import axios from 'axios';
 
 const api = axios.create({

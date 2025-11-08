@@ -1,4 +1,8 @@
+// --------------------------------------------------------------------
+// src/db/fake.js
 // super tiny in-memory store just for local testing
+// not for production use!
+// --------------------------------------------------------------------
 const orders = new Map([
   ['ORD1001', { order_id: 'ORD1001', status: 'AUTHORIZED', customer_name: 'Alice', card_last4: '4242', amount: 149.95, created_at: new Date().toISOString() }],
   ['ORD1002', { order_id: 'ORD1002', status: 'AUTHORIZED', customer_name: 'Bob',   card_last4: '1111', amount: 100.00, created_at: new Date().toISOString() }],

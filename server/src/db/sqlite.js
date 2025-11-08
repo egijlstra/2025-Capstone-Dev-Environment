@@ -1,4 +1,8 @@
+// --------------------------------------------------------------------
 // src/db/sqlite.js
+// Implements a SQLite database connection using better-sqlite3
+// Exports a shared database instance and a helper to get it
+// --------------------------------------------------------------------
 import 'dotenv/config';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';

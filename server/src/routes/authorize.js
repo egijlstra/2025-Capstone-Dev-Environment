@@ -1,4 +1,9 @@
+// --------------------------------------------------------------------
 // src/routes/authorize.js
+// Express router handling /api/authorize POST requests
+// Integrates with mock payment provider to authorize payments
+// and updates order and authorization records accordingly.
+// --------------------------------------------------------------------
 import { Router } from 'express';
 import { ORDER_STATUS, AUTH_OUTCOME, PROVIDER_BASE_URL, STATIC_TOKEN_PREFIX } from '../shared/constants.js';
 

@@ -1,4 +1,7 @@
 // scripts/add-expires-column.js
+// Script to add expires_at column to authorizations table
+// Run with: node scripts/add-expires-column.js
+// Intended for one-time use during migrations
 import { db } from '../src/db/sqlite.js';
 
 try {

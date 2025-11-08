@@ -1,5 +1,8 @@
+// --------------------------------------------------------------------
 // src/db/sequence.js
 // Helper for computing the next sequential ORD-<number> order_id
+// and generating realistic random amounts for orders.
+// --------------------------------------------------------------------
 import { db } from './sqlite.js';
 
 /**

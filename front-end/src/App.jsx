@@ -1,4 +1,10 @@
+// ----------------------------------------------------------------------------
 // src/App.jsx
+// Main application component for the warehouse admin portal.
+// Manages view state and renders the appropriate component
+// for payment processing, warehouse settlement, or order history.
+// Utilizes React hooks for state management.
+// ----------------------------------------------------------------------------
 import React, { useState } from 'react';
 import WarehouseSettlement from './components/WarehouseSettlement.jsx';
 import PaymentProcessingUI from './components/PaymentProcessingUI.jsx';

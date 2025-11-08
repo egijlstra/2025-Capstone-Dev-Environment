@@ -1,4 +1,7 @@
 // scripts/reset-db.js
+// Script to reset the database to original seven orders + matching authorizations
+// Run with: node scripts/reset-db.js
+
 import 'dotenv/config';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
@@ -11,7 +14,7 @@ const __dirname = path.dirname(__filename);
 // DB path consistent with your app
 const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, '../database/database.db');
 
-// Keep constants in sync with your app
+// Keep constants in sync with app
 const ORDER_STATUS = {
   PENDING: 'PENDING',
   AUTHORIZED: 'AUTHORIZED',
@@ -26,7 +29,7 @@ const AUTH_OUTCOME = {
 };
 const STATIC_TOKEN_PREFIX = 'STATIC_TOKEN_';
 
-// ---- Original 7 orders (from your current DB snapshot) ----
+// ---- Original 7 orders (from original DB snapshot) ----
 // order_id, status, customer_name, card_last4, amount, created_at
 const ORIGINAL_SEVEN = [
   ['ORD-1001', 'AUTHORIZED', 'Erik Gijlstra', '4242', 12.99, '2025-10-01T10:00Z'],

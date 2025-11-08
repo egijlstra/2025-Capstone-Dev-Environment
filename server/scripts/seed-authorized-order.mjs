@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // scripts/seed-authorized-order.mjs
 // Creates a demo order and marks it AUTHORIZED so the Warehouse UI can settle it.
+// Run with: node scripts/seed-authorized-order.mjs [orderId] [amount] [cardLast4]
 
 import {
   createOrder,
@@ -36,7 +37,7 @@ async function main() {
 
   await updateOrderStatus(orderId, 'AUTHORIZED');
 
-  // 3) Show a quick summary you can eyeball
+  // 3) Show a quick summary
   const auth = await getAuthorizationByOrderId(orderId);
   const settledSoFar = await sumSettlementsForOrder(orderId);
   const available = toMoney((auth?.amount || 0) - settledSoFar);

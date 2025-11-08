@@ -1,4 +1,9 @@
+// --------------------------------------------------------------------
 // index.js
+// Main entry point for the Express server application
+// Sets up middleware, routes, and error handling
+// and starts the server listening on the specified port.
+// --------------------------------------------------------------------
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';

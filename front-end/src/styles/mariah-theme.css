@@ -1,5 +1,6 @@
 /* src/styles/mariah-theme.css */
 /* Global version of Mariah’s look (no scoping), safe for the whole app */
+/* Based on Mariah's theme used for PaymentProcessingUI.jsx */
 
 /* Layout / background */
 html, body, #root {
@@ -276,4 +277,18 @@ h5.text-center { color: #ffffff !important; }
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Subtle shake animation for invalid order ID input */
+@keyframes ws-shake-horizontal {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+.shake {
+  animation: ws-shake-horizontal 0.3s ease;
 }

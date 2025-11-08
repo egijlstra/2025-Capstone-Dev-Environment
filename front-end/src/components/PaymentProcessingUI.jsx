@@ -1,5 +1,11 @@
+// --------------------------------------------------------------
 // src/components/PaymentProcessingUI.jsx
-import { useEffect, useState } from 'react';
+//  PaymentProcessingUI component for the Manhattan Associates Warehouse Portal
+//  Displays a payment form to authorize payments against orders
+//  Handles form state, validation, submission, and session transaction history
+//  Interacts with backend API via lib/api.js
+// --------------------------------------------------------------
+import { useEffect, useState, useRef } from 'react';
 import { getNextOrder, postAuthorize } from '../lib/api.js';
 
 function resolveOutcome(resp) {
@@ -102,6 +108,77 @@ function isValidCvvForType(rawCvv, cardType) {
   return digits.length === 3 || digits.length === 4;
 }
 
+/* ---------- Card type icon (visual only) ---------- */
+function cardTypeIcon(type) {
+  switch (type) {
+    case 'Visa':
+      return '🅥';
+    case 'Mastercard':
+      return 'Ⓜ️';
+    case 'American Express':
+      return '🅰️';
+    case 'Discover':
+      return '🅓';
+    default:
+      return '💳';
+  }
+}
+
+/* ---------- US States (front-end only, not sent to backend) ---------- */
+const US_STATES = [
+  { code: '', name: 'Select state' },
+  { code: 'AL', name: 'Alabama' },
+  { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' },
+  { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' },
+  { code: 'DE', name: 'Delaware' },
+  { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' },
+  { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' },
+  { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' },
+  { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' },
+  { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' },
+  { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' },
+  { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' },
+];
+
 /* ---------- UI ---------- */
 export default function PaymentProcessingUI() {
   const [loadingInit, setLoadingInit] = useState(true);
@@ -110,12 +187,22 @@ export default function PaymentProcessingUI() {
   const [orderId, setOrderId] = useState('');
   const [amount, setAmount] = useState(0);
 
-  // Customer fields (per MA brief)
+  // Customer / shipping fields (per MA brief, plus front-end-only state)
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName]   = useState('');
   const [address, setAddress]     = useState('');
   const [city, setCity]           = useState('');
+  const [shippingState, setShippingState] = useState('');
   const [zip, setZip]             = useState('');
+
+  // Billing fields (front-end only; NOT sent to backend)
+  const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+  const [billingFirstName, setBillingFirstName] = useState('');
+  const [billingLastName, setBillingLastName] = useState('');
+  const [billingAddress, setBillingAddress] = useState('');
+  const [billingCity, setBillingCity] = useState('');
+  const [billingState, setBillingState] = useState('');
+  const [billingZip, setBillingZip] = useState('');
 
   // Card fields
   const [nameOnCard, setNameOnCard] = useState('');
@@ -127,8 +214,16 @@ export default function PaymentProcessingUI() {
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice]         = useState(null); // {type, title, detail}
 
+  // Field-level error flags for a11y
+  const [zipError, setZipError] = useState(false);
+  const [expiryError, setExpiryError] = useState(false);
+  const [cvvError, setCvvError] = useState(false);
+
   // Right-panel: this-session activity (no backend storage)
   const [sessionTxns, setSessionTxns] = useState([]);
+
+  // Ref for CVV (for auto-advance from expiry)
+  const cvvInputRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -178,15 +273,75 @@ export default function PaymentProcessingUI() {
     e.preventDefault();
     setCardNumber(formatCardNumberForType(text, detected));
   };
-  const onExpiryChange = (e) => setExpiry(fmtExpiry(e.target.value));
+
+  // ZIP: force numeric and max 5 digits
+  const onZipChange = (e) => {
+    const digits = String(e.target.value || '').replace(/\D/g, '').slice(0, 5);
+    setZip(digits);
+    if (digits.length === 5) {
+      setZipError(false);
+    }
+  };
+
+  // (Optional) when billingSameAsShipping toggles from true → false,
+  // prefill billing fields with shipping info to feel realistic
+  const toggleBillingSameAsShipping = () => {
+    setBillingSameAsShipping((prev) => {
+      const next = !prev;
+      if (next) {
+        // When turning "same as shipping" ON, mirror shipping to billing
+        setBillingFirstName(firstName);
+        setBillingLastName(lastName);
+        setBillingAddress(address);
+        setBillingCity(city);
+        setBillingState(shippingState);
+        setBillingZip(zip);
+      }
+      return next;
+    });
+  };
+
+  // Expiry: format + auto-advance when MM/YY complete
+  const onExpiryChange = (e) => {
+    const formatted = fmtExpiry(e.target.value);
+    setExpiry(formatted);
+    setExpiryError(false);
+    if (formatted.length === 5 && /^\d{2}\/\d{2}$/.test(formatted)) {
+      if (cvvInputRef.current) {
+        cvvInputRef.current.focus();
+      }
+    }
+  };
+
+  const onCvvChange = (e) => {
+    setCvv(e.target.value);
+    setCvvError(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setNotice(null);
+    setZipError(false);
+    setExpiryError(false);
+    setCvvError(false);
+
+    // ZIP validation (5 digits)
+    const zipDigits = String(zip || '').replace(/\D/g, '');
+    if (zipDigits.length !== 5) {
+      setZipError(true);
+      setNotice({
+        type: 'danger',
+        title: 'Invalid ZIP code',
+        detail: 'Please enter a 5-digit ZIP code.',
+      });
+      setSubmitting(false);
+      return;
+    }
 
     // Expiry validation
     if (!isFutureExpiry(expiry)) {
+      setExpiryError(true);
       setNotice({
         type: 'danger',
         title: 'Card is expired',
@@ -208,6 +363,7 @@ export default function PaymentProcessingUI() {
         detail = 'Please enter a valid 3- or 4-digit security code.';
       }
 
+      setCvvError(true);
       setNotice({
         type: 'danger',
         title: 'Invalid CVV',
@@ -226,6 +382,7 @@ export default function PaymentProcessingUI() {
         orderId,
         amount,
         // canonical customer object (MA brief)
+        // IMPORTANT: do NOT add new fields here (no backend contract change)
         customer: {
           firstName,
           lastName,
@@ -334,10 +491,14 @@ export default function PaymentProcessingUI() {
       <div className="row g-4">
         {/* LEFT: Payment Form */}
         <div className="col-lg-8">
-          <form onSubmit={handleSubmit} className="card portal-card shadow-sm">
+          <form
+            onSubmit={handleSubmit}
+            className="card portal-card shadow-sm position-relative"
+            aria-busy={submitting}
+          >
             <div className="card-body">
-              <div className="row g-3">
-                {/* Order / Amount (read-only) */}
+              {/* Section: Order summary */}
+              <div className="row g-3 mb-2">
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">Order ID</label>
                   <input className="form-control" value={orderId} disabled aria-readonly="true" />
@@ -349,29 +510,176 @@ export default function PaymentProcessingUI() {
                     <input className="form-control" value={amount.toFixed(2)} disabled aria-readonly="true" />
                   </div>
                 </div>
+              </div>
 
-                {/* Customer (per MA brief) */}
+              {/* Section: Customer & Shipping Details */}
+              <h5 className="mt-2 mb-3">Customer &amp; Shipping Details</h5>
+              <div className="row g-3">
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">First Name</label>
-                  <input className="form-control" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+                  <input
+                    className="form-control"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">Last Name</label>
-                  <input className="form-control" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                  <input
+                    className="form-control"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="col-12">
                   <label className="form-label form-label-custom">Address</label>
-                  <input className="form-control" value={address} onChange={(e) => setAddress(e.target.value)} required />
+                  <input
+                    className="form-control"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    required
+                  />
                 </div>
-                <div className="col-md-8">
+                <div className="col-md-6">
                   <label className="form-label form-label-custom">City</label>
-                  <input className="form-control" value={city} onChange={(e) => setCity(e.target.value)} required />
+                  <input
+                    className="form-control"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    required
+                  />
                 </div>
-                <div className="col-md-4">
+                <div className="col-md-3">
+                  <label className="form-label form-label-custom">State</label>
+                  <select
+                    className="form-select"
+                    value={shippingState}
+                    onChange={(e) => setShippingState(e.target.value)}
+                    required
+                  >
+                    {US_STATES.map((s) => (
+                      <option key={s.code || 'blank'} value={s.code}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-md-3">
                   <label className="form-label form-label-custom">ZIP</label>
-                  <input className="form-control" value={zip} onChange={(e) => setZip(e.target.value)} required inputMode="numeric" />
+                  <input
+                    className={`form-control${zipError ? ' is-invalid' : ''}`}
+                    value={zip}
+                    onChange={onZipChange}
+                    required
+                    inputMode="numeric"
+                    aria-invalid={zipError ? 'true' : undefined}
+                  />
+                  {zipError && (
+                    <div className="invalid-feedback d-block">
+                      Please enter a 5-digit ZIP code.
+                    </div>
+                  )}
                 </div>
 
+                {/* Billing same as shipping toggle */}
+                <div className="col-12">
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      id="billingSameCheckbox"
+                      className="form-check-input"
+                      checked={billingSameAsShipping}
+                      onChange={toggleBillingSameAsShipping}
+                    />
+                    <label
+                      className="form-check-label"
+                      htmlFor="billingSameCheckbox"
+                    >
+                      Billing address is the same as shipping
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Billing Details (purely for UI; not sent to backend) */}
+              {!billingSameAsShipping && (
+                <div className="mt-3">
+                  <h5 className="mb-3">Billing Details</h5>
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <label className="form-label form-label-custom">First Name</label>
+                      <input
+                        className="form-control"
+                        value={billingFirstName}
+                        onChange={(e) => setBillingFirstName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label form-label-custom">Last Name</label>
+                      <input
+                        className="form-control"
+                        value={billingLastName}
+                        onChange={(e) => setBillingLastName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label form-label-custom">Address</label>
+                      <input
+                        className="form-control"
+                        value={billingAddress}
+                        onChange={(e) => setBillingAddress(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label form-label-custom">City</label>
+                      <input
+                        className="form-control"
+                        value={billingCity}
+                        onChange={(e) => setBillingCity(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-md-3">
+                      <label className="form-label form-label-custom">State</label>
+                      <select
+                        className="form-select"
+                        value={billingState}
+                        onChange={(e) => setBillingState(e.target.value)}
+                        required
+                      >
+                        {US_STATES.map((s) => (
+                          <option key={s.code || 'blank-billing'} value={s.code}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-3">
+                      <label className="form-label form-label-custom">ZIP</label>
+                      <input
+                        className="form-control"
+                        value={billingZip}
+                        onChange={(e) =>
+                          setBillingZip(
+                            String(e.target.value || '').replace(/\D/g, '').slice(0, 5)
+                          )
+                        }
+                        required
+                        inputMode="numeric"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Section: Payment Details */}
+              <h5 className="mt-4 mb-3">Payment Details</h5>
+              <div className="row g-3">
                 {/* Cardholder Name */}
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">Name on Card</label>
@@ -390,7 +698,12 @@ export default function PaymentProcessingUI() {
                   <label className="form-label form-label-custom d-flex align-items-center justify-content-between">
                     <span>Card Number</span>
                     <span className="small" style={{ opacity: 0.9 }}>
-                      {cardType && <span className="badge bg-secondary">{cardType}</span>}
+                      {cardType && (
+                        <span className="d-inline-flex align-items-center gap-1">
+                          <span aria-hidden="true">{cardTypeIcon(cardType)}</span>
+                          <span className="badge bg-secondary">{cardType}</span>
+                        </span>
+                      )}
                     </span>
                   </label>
                   <input
@@ -409,38 +722,76 @@ export default function PaymentProcessingUI() {
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">Expiry (MM/YY)</label>
                   <input
-                    className="form-control"
+                    className={`form-control${expiryError ? ' is-invalid' : ''}`}
                     value={expiry}
                     onChange={onExpiryChange}
                     required
                     placeholder="MM/YY"
                     inputMode="numeric"
                     autoComplete="cc-exp"
+                    aria-invalid={expiryError ? 'true' : undefined}
                   />
+                  {expiryError && (
+                    <div className="invalid-feedback d-block">
+                      Please enter a valid, non-expired date in MM/YY format.
+                    </div>
+                  )}
                 </div>
 
                 {/* CVV */}
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">CVV</label>
                   <input
+                    ref={cvvInputRef}
                     type="password"
-                    className="form-control"
+                    className={`form-control${cvvError ? ' is-invalid' : ''}`}
                     value={cvv}
-                    onChange={(e) => setCvv(e.target.value)}
+                    onChange={onCvvChange}
                     required
                     inputMode="numeric"
                     placeholder=""
                     autoComplete="cc-csc"
+                    aria-invalid={cvvError ? 'true' : undefined}
                   />
+                  {cvvError && (
+                    <div className="invalid-feedback d-block">
+                      Please enter a valid security code for this card.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="card-footer d-flex gap-2">
-              <button type="submit" className="btn btn-primary btn-process-payment" disabled={submitting}>
+              <button
+                type="submit"
+                className="btn btn-primary btn-process-payment"
+                disabled={submitting}
+              >
                 {submitting ? 'Authorizing…' : 'Pay Now'}
               </button>
             </div>
+
+            {/* Subtle loading overlay while submitting */}
+            {submitting && (
+              <div
+                className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                style={{
+                  background: 'rgba(0,0,0,0.45)',
+                  borderRadius: 'inherit',
+                  zIndex: 10,
+                }}
+              >
+                <div className="d-flex align-items-center">
+                  <div
+                    className="spinner-border me-2"
+                    role="status"
+                    aria-hidden="true"
+                  />
+                  <span>Authorizing payment…</span>
+                </div>
+              </div>
+            )}
           </form>
         </div>
 

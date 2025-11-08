@@ -1,4 +1,9 @@
+// --------------------------------------------------------------------
 // src/routes/settlements.js
+// Express router handling /api/settlements POST requests
+// Processes settlement requests against authorized orders,
+// ensuring business rules are followed and updating records.
+// --------------------------------------------------------------------
 import { Router } from 'express';
 import { ORDER_STATUS } from '../shared/constants.js';
 
@@ -52,7 +57,7 @@ router.post('/', async (req, res) => {
     const available = toMoney(authorized - settledSoFar);
 
     if (amount > available) {
-      // Preserving your current behavior: 422 when exceeding available
+      // Preserving current behavior: 422 when exceeding available
       return res
         .status(422)
         .json({ code: 'AMOUNT_EXCEEDS_AVAILABLE', availableToSettle: available });

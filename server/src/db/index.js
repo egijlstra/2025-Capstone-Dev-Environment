@@ -1,4 +1,9 @@
+// --------------------------------------------------------------------
 // src/db/index.js
+// this is the SQLite-based implementation of the DB adapter
+// implements the same API as src/db/fake.js
+// used in development/testing and production
+// --------------------------------------------------------------------
 import { getDb } from './sqlite.js';
 
 // --- orders ---
