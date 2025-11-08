@@ -2,9 +2,11 @@
 import React, { useState } from 'react';
 import WarehouseSettlement from './components/WarehouseSettlement.jsx';
 import PaymentProcessingUI from './components/PaymentProcessingUI.jsx';
+import OrderHistory from './components/OrderHistory.jsx';
 
 export default function App() {
-  const [view, setView] = useState('checkout'); // 'checkout' | 'warehouse'
+  // 'checkout' | 'warehouse' | 'orders'
+  const [view, setView] = useState('checkout');
 
   return (
     <div>
@@ -18,18 +20,29 @@ export default function App() {
               <p className="brand-subtitle">Supply Chain Commerce Platform</p>
             </div>
           </div>
+
+          {/* View toggle buttons */}
           <div className="btn-group" role="group" aria-label="Views">
             <button
               className={`btn ${view === 'checkout' ? 'btn-dark' : 'btn-outline-dark'}`}
               onClick={() => setView('checkout')}
+              type="button"
             >
               Checkout (Authorize)
             </button>
             <button
               className={`btn ${view === 'warehouse' ? 'btn-dark' : 'btn-outline-dark'}`}
               onClick={() => setView('warehouse')}
+              type="button"
             >
               Warehouse Settlement
+            </button>
+            <button
+              className={`btn ${view === 'orders' ? 'btn-dark' : 'btn-outline-dark'}`}
+              onClick={() => setView('orders')}
+              type="button"
+            >
+              Orders Viewer
             </button>
           </div>
         </div>
@@ -37,7 +50,9 @@ export default function App() {
 
       <div className="main-content">
         <div className="content-container">
-          {view === 'checkout' ? <PaymentProcessingUI /> : <WarehouseSettlement />}
+          {view === 'checkout' && <PaymentProcessingUI />}
+          {view === 'warehouse' && <WarehouseSettlement />}
+          {view === 'orders' && <OrderHistory />}
         </div>
       </div>
     </div>

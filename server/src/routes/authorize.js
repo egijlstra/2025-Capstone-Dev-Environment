@@ -38,7 +38,7 @@ router.post('/', async (req, res) => {
     // Order ID
     const normOrderId = b.orderId ?? b.order_id ?? '';
 
-    // Amount
+    // Amount (accept requestedAmount or amount; coerce string -> number)
     const normRequestedAmount =
       typeof b.requestedAmount === 'number'
         ? b.requestedAmount
@@ -75,35 +75,44 @@ router.post('/', async (req, res) => {
     // CVV
     const normCvv = String(b.card?.cvv ?? b.cvv ?? b.cvc ?? b.securityCode ?? '').trim();
 
-    // Cardholder name
+    // Cardholder name (for fallback first/last if customer not provided)
     const holderName = b.card?.name ?? b.nameOnCard ?? b.cardName ?? '';
-    let firstName = '', lastName = '';
+    let fallbackFirst = '', fallbackLast = '';
     if (holderName) {
       const parts = String(holderName).trim().split(/\s+/);
-      firstName = parts[0] ?? '';
-      lastName = parts.slice(1).join(' ') || '';
+      fallbackFirst = parts[0] ?? '';
+      fallbackLast = parts.slice(1).join(' ') || '';
     }
 
-    // Build canonical objects ONLY if they are missing,
-    // so we don't break callers already sending the full canonical shape.
-    const normalized = {
-      orderId: normOrderId,
-      requestedAmount: normRequestedAmount,
-      customer: b.customer ?? {
-        firstName,
-        lastName,
-      },
-      card: b.card ?? {
-        number: normCardNumber,
-        expMonth: expMonth,
-        expYear: expYear,
-        cvv: normCvv,
-        name: holderName,
-      },
+    // Build customer object:
+    // Prefer explicit b.customer; else accept flat fields; else derive first/last from holder name.
+    const normalizedCustomer =
+      (b.customer && typeof b.customer === 'object')
+        ? b.customer
+        : {
+            firstName: (b.firstName ?? fallbackFirst)?.toString().trim(),
+            lastName : (b.lastName  ?? fallbackLast )?.toString().trim(),
+            address  : (b.address   ?? ''          )?.toString().trim(),
+            zip      : (b.zip       ?? ''          )?.toString().trim(),
+          };
+
+    // Build card object if caller didn't already send canonical shape
+    const normalizedCard = b.card ?? {
+      number  : normCardNumber,
+      expMonth: expMonth,
+      expYear : expYear,
+      cvv     : normCvv,
+      name    : holderName,
     };
 
     // Merge back onto req.body so existing logic below can stay the same
-    req.body = { ...b, ...normalized };
+    req.body = {
+      ...b,
+      orderId: normOrderId,
+      requestedAmount: normRequestedAmount,
+      customer: normalizedCustomer,
+      card: normalizedCard,
+    };
     // --- end normalization ---
 
     const { orderId, customer, card, requestedAmount } = req.body || {};

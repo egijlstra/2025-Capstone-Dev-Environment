@@ -229,3 +229,51 @@ h5.text-center { color: #ffffff !important; }
   background: rgba(255, 255, 255, 0.3) !important;
   border-color: rgba(255, 255, 255, 0.7) !important;
 }
+
+/* === OrderHistory visual fixes === */
+
+/* 1) Force black text for all table cells/headers in the Orders table
+   – override the global .card-body / .fw-semibold white rules */
+.card.portal-card .order-history-table th,
+.card.portal-card .order-history-table td,
+.card.portal-card .order-history-table td.fw-semibold {
+  color: #000 !important;
+}
+
+/* 2) Payment column: override .card.portal-card .text-muted white-on-dark */
+.card.portal-card .order-history-table td.text-muted,
+.card.portal-card .order-history-table td.text-muted span,
+.card.portal-card .order-history-table td.text-muted small {
+  color: #000 !important;
+}
+
+/* 3) Keep status badges readable (white text on colored pill) */
+.card.portal-card .order-history-table td .badge,
+.card.portal-card .order-history-table .badge.bg-success,
+.card.portal-card .order-history-table .badge.bg-primary,
+.card.portal-card .order-history-table .badge.bg-danger,
+.card.portal-card .order-history-table .badge.bg-warning,
+.card.portal-card .order-history-table .badge.bg-secondary {
+  color: #fff !important;
+}
+
+/* 4) Nav-pills styling for Current/Past tabs */
+.nav-pills .nav-link {
+  color: rgba(255, 255, 255, 0.8);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-right: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.nav-pills .nav-link.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.nav-pills .nav-link:hover:not(.active) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}

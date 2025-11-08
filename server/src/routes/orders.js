@@ -1,3 +1,4 @@
+// src/routes/orders.js
 import { Router } from 'express';
 const router = Router();
 
@@ -9,16 +10,15 @@ import {
   sumSettlementsForOrder,
 } from '../db/index.js';
 
-// helpers
-const toNumber = (v, fallback) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-};
+// --- Helper functions ---
 const cmpStr = (a = '', b = '') => a.localeCompare(b, undefined, { sensitivity: 'base' });
 const cmpNum = (a = 0, b = 0) => a - b;
 const cmpDate = (a, b) => new Date(a).getTime() - new Date(b).getTime();
 
-// GET /api/orders  (list with optional status, q, sort, dir, page, pageSize)
+// ===========================================================
+// GET /api/orders
+// Returns ALL orders (no pagination) with optional filtering and sorting.
+// ===========================================================
 router.get('/', async (req, res) => {
   try {
     const {
@@ -26,24 +26,27 @@ router.get('/', async (req, res) => {
       q,
       sort = 'created_at',
       dir = 'desc',
-      page = '1',
-      pageSize = '20',
     } = req.query;
 
+    // --- Pull all rows from DB (no LIMIT or OFFSET) ---
     let rows = await dbListOrders();
 
+    // --- Filter by status if provided ---
     if (status) {
-      rows = rows.filter(r => String(r.status) === String(status));
+      rows = rows.filter((r) => String(r.status).toUpperCase() === String(status).toUpperCase());
     }
 
+    // --- Filter by search query (order ID or customer name) ---
     if (q) {
       const needle = String(q).toLowerCase();
-      rows = rows.filter(r =>
-        String(r.order_id).toLowerCase().includes(needle) ||
-        String(r.customer_name || '').toLowerCase().includes(needle)
+      rows = rows.filter(
+        (r) =>
+          String(r.order_id).toLowerCase().includes(needle) ||
+          String(r.customer_name || '').toLowerCase().includes(needle)
       );
     }
 
+    // --- Sort results ---
     const dirSign = String(dir).toLowerCase() === 'asc' ? 1 : -1;
     const key = String(sort);
     rows.sort((a, b) => {
@@ -57,19 +60,18 @@ router.get('/', async (req, res) => {
       return dirSign * delta;
     });
 
-    const p = Math.max(1, toNumber(page, 1));
-    const ps = Math.max(1, toNumber(pageSize, 20));
-    const start = (p - 1) * ps;
-    const end = start + ps;
-
-    return res.json(rows.slice(start, end));
+    // --- Return ALL rows (no pagination slicing) ---
+    return res.json(rows);
   } catch (e) {
-    console.error(e);
+    console.error('Error listing orders:', e);
     res.status(500).json({ code: 'SERVER_ERROR' });
   }
 });
 
-// GET /api/orders/:id  (detail block for Settlement UI)
+// ===========================================================
+// GET /api/orders/:id
+// Returns detailed order info for the Warehouse Settlement UI.
+// ===========================================================
 router.get('/:id', async (req, res) => {
   try {
     const orderId = req.params.id;
@@ -82,10 +84,10 @@ router.get('/:id', async (req, res) => {
     const authorization = await getAuthorizationByOrderId(orderId);
     const settlements = await listSettlementsByOrderId(orderId);
     const settled = await sumSettlementsForOrder(orderId);
+
     const authorizedAmt = authorization?.amount ?? 0;
     const availableToSettle = Math.max(0, Number((authorizedAmt - settled).toFixed(2)));
 
-    // Preserve exact top-level shape required by your frontend
     return res.json({
       order,
       authorization,
@@ -93,7 +95,7 @@ router.get('/:id', async (req, res) => {
       availableToSettle,
     });
   } catch (e) {
-    console.error(e);
+    console.error('Error fetching order details:', e);
     res.status(500).json({ code: 'SERVER_ERROR' });
   }
 });

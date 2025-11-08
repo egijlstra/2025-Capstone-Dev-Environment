@@ -10,66 +10,62 @@ function resolveOutcome(resp) {
   return 'SUCCESS';
 }
 
-// --- Card type detection (Visa / Mastercard / AmEx) ---
+/* ---------- Card brand detection ---------- */
 function detectCardType(input) {
   const n = String(input || '').replace(/\D/g, '');
+
+  // Visa
   if (/^4/.test(n)) return 'Visa';
-  // MasterCard: 51–55 or 2221–2720
+
+  // Mastercard (51–55, 2221–2720)
   if (/^(5[1-5]|2(2[2-9]|[3-6][0-9]|7[01]|720))/.test(n)) return 'Mastercard';
-  // American Express: 34 or 37
+
+  // American Express (34, 37)
   if (/^3[47]/.test(n)) return 'American Express';
-  return null; // unknown/other
+
+  // Discover (common BIN ranges: 6011, 65, 64[4-9], 622xxx)
+  if (/^6(?:011|5|4[4-9]|22)/.test(n)) return 'Discover';
+
+  return null;
 }
 
-// --- Expiry auto-format (MM/YY) ---
+/* ---------- Expiry helpers (MM/YY) ---------- */
 function fmtExpiry(value) {
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 4); // max 4 digits (MMYY)
-  if (digits.length <= 2) return digits; // "M", "MM"
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`; // "MM/YY"
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 }
-
-// --- Expiry must be in the future (MM/YY) ---
 function isFutureExpiry(mmYY) {
   const m = (mmYY || '').match(/^(\d{2})\/(\d{2})$/);
   if (!m) return false;
   const [, mm, yy] = m;
   const month = Number(mm);
   if (month < 1 || month > 12) return false;
-  const year = 2000 + Number(yy); // interpret YY as 20YY
+  const year = 2000 + Number(yy);
   const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
   return endOfMonth >= new Date();
 }
-
-// --- Card number & CVV length helpers ---
-function getExpectedPanLength(type) {
-  // Visa/MC = 16, AmEx = 15
-  if (type === 'American Express') return 15;
-  if (type === 'Visa' || type === 'Mastercard') return 16;
-  return null; // unknown brand → no strict PAN rule
+function splitExpiry(mmYY) {
+  const m = (mmYY || '').match(/^(\d{2})\/(\d{2})$/);
+  if (!m) return { expMonth: '', expYear: '' };
+  const [, mm, yy] = m;
+  return { expMonth: mm, expYear: `20${yy}` };
 }
 
-function getExpectedCvvLength(type) {
-  // AmEx = 4, Visa/MC = 3
-  if (type === 'American Express') return 4;
-  if (type === 'Visa' || type === 'Mastercard') return 3;
-  return 3; // default to 3 if unknown
-}
-
-/** ---------- Card number formatting helpers ---------- **/
+/* ---------- Card number formatting ---------- */
 function getCardFormat(type) {
   switch (type) {
     case 'American Express':
       return { max: 15, groups: [4, 6, 5] };
     case 'Mastercard':
     case 'Visa':
+    case 'Discover':
     default:
       return { max: 16, groups: [4, 4, 4, 4] };
   }
 }
-
 function formatWithGroups(digits, groups) {
-  let out = '';
-  let idx = 0;
+  let out = '', idx = 0;
   for (let i = 0; i < groups.length; i++) {
     const size = groups[i];
     const chunk = digits.slice(idx, idx + size);
@@ -80,7 +76,6 @@ function formatWithGroups(digits, groups) {
   }
   return out;
 }
-
 function formatCardNumberForType(input, type) {
   const digits = String(input || '').replace(/\D/g, '');
   const { max, groups } = getCardFormat(type);
@@ -88,6 +83,26 @@ function formatCardNumberForType(input, type) {
   return formatWithGroups(trimmed, groups);
 }
 
+/* ---------- CVV validation ---------- */
+function isValidCvvForType(rawCvv, cardType) {
+  const digits = String(rawCvv || '').replace(/\D/g, '');
+  if (!digits) return false;
+
+  if (cardType === 'American Express') {
+    // Amex: 4-digit security code
+    return digits.length === 4;
+  }
+
+  if (cardType === 'Visa' || cardType === 'Mastercard' || cardType === 'Discover') {
+    // Visa / MC / Discover: 3-digit CVV
+    return digits.length === 3;
+  }
+
+  // Unknown brand → accept 3 or 4 digits
+  return digits.length === 3 || digits.length === 4;
+}
+
+/* ---------- UI ---------- */
 export default function PaymentProcessingUI() {
   const [loadingInit, setLoadingInit] = useState(true);
   const [errorInit, setErrorInit] = useState(null);
@@ -95,18 +110,24 @@ export default function PaymentProcessingUI() {
   const [orderId, setOrderId] = useState('');
   const [amount, setAmount] = useState(0);
 
-  // Card form fields
+  // Customer fields (per MA brief)
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName]   = useState('');
+  const [address, setAddress]     = useState('');
+  const [city, setCity]           = useState('');
+  const [zip, setZip]             = useState('');
+
+  // Card fields
   const [nameOnCard, setNameOnCard] = useState('');
-  const [cardNumber, setCardNumber] = useState(''); // formatted value shown to user
-  const [cardType, setCardType] = useState(null);   // detected type
-  const [expiry, setExpiry] = useState('');
-  const [cvv, setCvv] = useState('');
+  const [cardNumber, setCardNumber] = useState(''); // formatted display value
+  const [cardType, setCardType]     = useState(null);
+  const [expiry, setExpiry]         = useState('');
+  const [cvv, setCvv]               = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [notice, setNotice]         = useState(null); // {type, title, detail}
 
-  // Right-panel: this-session activity only (no backend changes)
+  // Right-panel: this-session activity (no backend storage)
   const [sessionTxns, setSessionTxns] = useState([]);
 
   useEffect(() => {
@@ -125,71 +146,122 @@ export default function PaymentProcessingUI() {
         setLoadingInit(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const appendSessionTxn = (entry) =>
     setSessionTxns((prev) => [{ id: crypto.randomUUID(), ...entry }, ...prev].slice(0, 8));
 
+  const outcomeBadgeClass = (o) => {
+    const s = String(o || '').toUpperCase();
+    if (s.includes('SUCCESS') || s.includes('AUTHORIZED')) return 'badge bg-success';
+    if (s.includes('INSUFFICIENT')) return 'badge bg-warning';
+    if (s.includes('INCORRECT') || s.includes('ERROR') || s.includes('SERVER')) return 'badge bg-danger';
+    return 'badge bg-secondary';
+  };
+  const fmtMoney = (n) => `$${Number(n ?? 0).toFixed(2)}`;
+  const fmtTime = (iso) => {
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  };
+
+  /* ---- Input handlers ---- */
+  const onCardNumberChange = (e) => {
+    const raw = e.target.value;
+    const detected = detectCardType(raw);
+    setCardType(detected);
+    setCardNumber(formatCardNumberForType(raw, detected));
+  };
+  const onCardNumberPaste = (e) => {
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    const detected = detectCardType(text);
+    setCardType(detected);
+    e.preventDefault();
+    setCardNumber(formatCardNumberForType(text, detected));
+  };
+  const onExpiryChange = (e) => setExpiry(fmtExpiry(e.target.value));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setErrorMsg('');
-    setResult(null);
+    setNotice(null);
 
-    // Client-side expiry check (FR requirement)
+    // Expiry validation
     if (!isFutureExpiry(expiry)) {
-      setErrorMsg('Card is expired. Please check the expiry date (MM/YY).');
+      setNotice({
+        type: 'danger',
+        title: 'Card is expired',
+        detail: 'Please check the expiry date (MM/YY) and try again.'
+      });
       setSubmitting(false);
       return;
     }
 
-    // 🔒 Brand-specific PAN/CVV validation (FR polish)
-    const digitsOnly = String(cardNumber).replace(/\D/g, '');
-    const brand = detectCardType(digitsOnly) || cardType; // re-detect from digits just in case
+    // CVV validation (brand-specific)
+    const cvvDigits = String(cvv || '').replace(/\D/g, '');
+    if (!isValidCvvForType(cvvDigits, cardType)) {
+      let detail;
+      if (cardType === 'American Express') {
+        detail = 'American Express cards require a 4-digit security code.';
+      } else if (cardType === 'Visa' || cardType === 'Mastercard' || cardType === 'Discover') {
+        detail = `${cardType} cards require a 3-digit security code.`;
+      } else {
+        detail = 'Please enter a valid 3- or 4-digit security code.';
+      }
 
-    const expectedPan = getExpectedPanLength(brand);
-    if (expectedPan && digitsOnly.length !== expectedPan) {
-      setErrorMsg(`Card number must be ${expectedPan} digits for ${brand}.`);
-      setSubmitting(false);
-      return;
-    }
-
-    const expectedCvv = getExpectedCvvLength(brand);
-    if (!/^\d+$/.test(cvv) || cvv.length !== expectedCvv) {
-      setErrorMsg(`CVV must be ${expectedCvv} digits for ${brand || 'this card'}.`);
+      setNotice({
+        type: 'danger',
+        title: 'Invalid CVV',
+        detail,
+      });
       setSubmitting(false);
       return;
     }
 
     try {
-      // Build payload; sanitize PAN back to digits
+      // sanitize PAN to digits & split expiry for canonical card object
+      const pan = String(cardNumber).replace(/\D/g, '');
+      const { expMonth, expYear } = splitExpiry(expiry);
+
       const payload = {
         orderId,
         amount,
-        cardNumber: digitsOnly, // sanitize
-        cvv,
+        // canonical customer object (MA brief)
+        customer: {
+          firstName,
+          lastName,
+          address,
+          city,
+          zip
+        },
+        // canonical card object (plus we also include legacy aliases for safety)
+        card: {
+          number: pan,
+          expMonth,
+          expYear,
+          cvv: cvvDigits,   // sanitized
+          name: nameOnCard
+        },
+        // legacy aliases kept for compatibility
+        cardNumber: pan,
         nameOnCard,
         expiry,
-        // aliases some backends expect
-        cardName: nameOnCard,
-        expiryDate: expiry,
+        expiryDate: expiry
       };
 
       const resp = await postAuthorize(payload);
-      setResult(resp);
 
       const outcome = resolveOutcome(resp);
-      appendSessionTxn({
-        orderId,
-        amount,
-        outcome,
-        when: new Date().toISOString(),
+      appendSessionTxn({ orderId, amount, outcome, when: new Date().toISOString() });
+
+      // Success banner
+      const maskedLast4 = pan.slice(-4).padStart(4, '•');
+      setNotice({
+        type: 'success',
+        title: 'Payment authorized',
+        detail: `Order ${orderId} authorized for ${fmtMoney(amount)} (Card •••• ${maskedLast4}).`
       });
 
-      // prepare next order
+      // Fetch next suggested order/amount for rapid testing
       try {
         const next = await getNextOrder();
         setOrderId(next.orderId);
@@ -197,17 +269,32 @@ export default function PaymentProcessingUI() {
       } catch {}
     } catch (err) {
       console.error(err);
-      setErrorMsg('Authorization failed. Please check details or try again.');
-
-      const outcome =
+      const code =
         err?.response?.data?.code ||
         err?.code ||
         'SERVER_ERROR';
+
+      let title = 'Authorization failed';
+      let detail = 'Please verify your details and try again.';
+      const up = String(code).toUpperCase();
+      if (up.includes('INSUFFICIENT')) {
+        title = 'Insufficient funds';
+        detail = 'The issuing bank declined the charge due to insufficient funds.';
+      } else if (up.includes('INCORRECT')) {
+        title = 'Incorrect card details';
+        detail = 'One or more card fields appear invalid. Please double-check and retry.';
+      } else if (up.includes('PROVIDER')) {
+        title = 'Payment provider error';
+        detail = 'There was a temporary problem with the payment service. Please try again.';
+      }
+
+      setNotice({ type: 'danger', title, detail });
+
       appendSessionTxn({
         orderId,
         amount,
-        outcome: String(outcome),
-        when: new Date().toISOString(),
+        outcome: String(code),
+        when: new Date().toISOString()
       });
     } finally {
       setSubmitting(false);
@@ -221,7 +308,6 @@ export default function PaymentProcessingUI() {
       </div>
     );
   }
-
   if (errorInit) {
     return (
       <div className="container py-4">
@@ -233,52 +319,17 @@ export default function PaymentProcessingUI() {
     );
   }
 
-  const outcomeBadgeClass = (o) => {
-    const s = String(o || '').toUpperCase();
-    if (s.includes('SUCCESS') || s.includes('AUTHORIZED')) return 'badge bg-success';
-    if (s.includes('INSUFFICIENT')) return 'badge bg-warning';
-    if (s.includes('INCORRECT') || s.includes('ERROR') || s.includes('SERVER')) return 'badge bg-danger';
-    return 'badge bg-secondary';
-  };
-
-  const fmtMoney = (n) => `$${Number(n ?? 0).toFixed(2)}`;
-  const fmtTime = (iso) => {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString();
-    } catch {
-      return iso;
-    }
-  };
-
-  // --- Reactive card number formatting & detection ---
-  const onCardNumberChange = (e) => {
-    const raw = e.target.value;
-    // First, detect based on digits (so length rules apply correctly)
-    const detected = detectCardType(raw);
-    setCardType(detected);
-    // Then format for that brand
-    const formatted = formatCardNumberForType(raw, detected);
-    setCardNumber(formatted);
-  };
-
-  const onCardNumberPaste = (e) => {
-    // Normalize pasted content into our formatting immediately
-    const text = (e.clipboardData || window.clipboardData).getData('text');
-    const detected = detectCardType(text);
-    setCardType(detected);
-    const formatted = formatCardNumberForType(text, detected);
-    e.preventDefault();
-    setCardNumber(formatted);
-  };
-
-  const onExpiryChange = (e) => {
-    setExpiry(fmtExpiry(e.target.value));
-  };
-
   return (
     <div className="container py-4">
       <h3 className="mb-3 text-on-dark">Checkout</h3>
+
+      {/* Friendly banner (replaces raw JSON) */}
+      {notice && (
+        <div className={`alert alert-${notice.type} alert-custom ${notice.type === 'success' ? 'success' : 'error'} mb-3`}>
+          <strong>{notice.title}</strong>
+          {notice.detail && <div className="mt-1">{notice.detail}</div>}
+        </div>
+      )}
 
       <div className="row g-4">
         {/* LEFT: Payment Form */}
@@ -286,38 +337,45 @@ export default function PaymentProcessingUI() {
           <form onSubmit={handleSubmit} className="card portal-card shadow-sm">
             <div className="card-body">
               <div className="row g-3">
-                {/* Order ID (disabled input to preserve original layout) */}
+                {/* Order / Amount (read-only) */}
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">Order ID</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={orderId}
-                    disabled
-                    aria-readonly="true"
-                  />
+                  <input className="form-control" value={orderId} disabled aria-readonly="true" />
                 </div>
-
-                {/* Amount (disabled input to preserve original layout) */}
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">Amount</label>
                   <div className="input-group">
                     <span className="input-group-text">$</span>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={amount.toFixed(2)}
-                      disabled
-                      aria-readonly="true"
-                    />
+                    <input className="form-control" value={amount.toFixed(2)} disabled aria-readonly="true" />
                   </div>
                 </div>
 
-                {/* Name on Card */}
+                {/* Customer (per MA brief) */}
+                <div className="col-md-6">
+                  <label className="form-label form-label-custom">First Name</label>
+                  <input className="form-control" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label form-label-custom">Last Name</label>
+                  <input className="form-control" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                </div>
+                <div className="col-12">
+                  <label className="form-label form-label-custom">Address</label>
+                  <input className="form-control" value={address} onChange={(e) => setAddress(e.target.value)} required />
+                </div>
+                <div className="col-md-8">
+                  <label className="form-label form-label-custom">City</label>
+                  <input className="form-control" value={city} onChange={(e) => setCity(e.target.value)} required />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label form-label-custom">ZIP</label>
+                  <input className="form-control" value={zip} onChange={(e) => setZip(e.target.value)} required inputMode="numeric" />
+                </div>
+
+                {/* Cardholder Name */}
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">Name on Card</label>
                   <input
-                    type="text"
                     className="form-control"
                     value={nameOnCard}
                     onChange={(e) => setNameOnCard(e.target.value)}
@@ -327,7 +385,7 @@ export default function PaymentProcessingUI() {
                   />
                 </div>
 
-                {/* Card Number + detected brand badge */}
+                {/* Card Number + brand badge */}
                 <div className="col-md-6">
                   <label className="form-label form-label-custom d-flex align-items-center justify-content-between">
                     <span>Card Number</span>
@@ -336,7 +394,6 @@ export default function PaymentProcessingUI() {
                     </span>
                   </label>
                   <input
-                    type="text"
                     className="form-control"
                     value={cardNumber}
                     onChange={onCardNumberChange}
@@ -348,11 +405,10 @@ export default function PaymentProcessingUI() {
                   />
                 </div>
 
-                {/* Expiry (auto MM/YY formatting) */}
+                {/* Expiry */}
                 <div className="col-md-6">
                   <label className="form-label form-label-custom">Expiry (MM/YY)</label>
                   <input
-                    type="text"
                     className="form-control"
                     value={expiry}
                     onChange={onExpiryChange}
@@ -384,31 +440,17 @@ export default function PaymentProcessingUI() {
               <button type="submit" className="btn btn-primary btn-process-payment" disabled={submitting}>
                 {submitting ? 'Authorizing…' : 'Pay Now'}
               </button>
-              {errorMsg && <div className="text-danger align-self-center">{errorMsg}</div>}
             </div>
           </form>
-
-          {/* Optional: raw result (kept for debugging; remove if you want it cleaner) */}
-          {result && (
-            <div className="alert alert-success mt-3 alert-custom success">
-              <strong>Authorization complete.</strong>
-              <pre className="mb-0 mt-2" style={{ whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(result, null, 2)}
-              </pre>
-            </div>
-          )}
         </div>
 
-        {/* RIGHT: This Session panel */}
+        {/* RIGHT: This Session */}
         <div className="col-lg-4">
           <div className="card portal-card shadow-sm">
             <div className="card-body">
               <h5 className="mb-3">This Session</h5>
-
               {sessionTxns.length === 0 ? (
-                <div className="text-muted" style={{ opacity: 0.8 }}>
-                  No attempts yet.
-                </div>
+                <div className="text-muted" style={{ opacity: 0.8 }}>No attempts yet.</div>
               ) : (
                 <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                   {sessionTxns.map((t) => (
