@@ -78,19 +78,28 @@ export default function WarehouseSettlement() {
     (details.authorization?.outcome === 'SUCCESS' ||
       details.order?.status === 'AUTHORIZED');
 
-  const available = details?.availableToSettle ?? null;
-  const hasRemaining = typeof available === 'number' ? available > 0 : false;
+  // Normalize availableToSettle to a number so type differences (string vs number)
+  // don't accidentally disable the Settle button.
+  const rawAvailable = details?.availableToSettle ?? null;
+  const available =
+    rawAvailable == null || rawAvailable === ''
+      ? null
+      : Number(rawAvailable);
+
+  const hasRemaining =
+    Number.isFinite(available) && available > 0;
 
   const canSettle = isValidAmountForInput && !!details && isAuthorized && hasRemaining;
 
   // Live preview of remaining after this settlement
   const numericAmount = Number(amount);
   const hasNumericAmount =
-    Number.isFinite(numericAmount) && numericAmount > 0 &&
+    Number.isFinite(numericAmount) &&
+    numericAmount > 0 &&
     Math.round(numericAmount * 100) === numericAmount * 100;
 
   const canPreviewRemaining =
-    details && typeof available === 'number' && hasNumericAmount;
+    hasRemaining && hasNumericAmount;
 
   const remainingAfter =
     canPreviewRemaining ? toMoney(available - numericAmount) : null;
